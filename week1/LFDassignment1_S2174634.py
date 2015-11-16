@@ -4,6 +4,7 @@ from sklearn.naive_bayes import MultinomialNB
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import LabelBinarizer
 from sklearn.metrics import accuracy_score, classification_report
+from collections import Counter
 
 # Function that reads the corpus given as an argument and based on the second argument uses the the binary or multinomial classification.
 def read_corpus(corpus_file, use_sentiment):
@@ -28,16 +29,19 @@ def read_corpus(corpus_file, use_sentiment):
 def identity(x):
     return x
 
-# X and Y are the returned documents and labels respectively. X and Y are both splitted at 75%, which implies 75% of the data is used as traindata and the rest as testdata.
+if len(sys.argv) != 2:
+    print("Usage: python LFDassignment1_S2174634.py Multinomial or python LFDassignment1_S2174634.py Binary", file=sys.stderr)
+    exit(-1)
 sentiment = sys.argv[1]
 if sentiment == "Multinomial":
     sentiment = False
 elif sentiment == "Binary":
     sentiment = True
 else:
-    print("Usage: python LFDassignment1.py Multinomial or python LFDassignment1 Binary", file=sys.stderr)
+    print("Usage: python LFDassignment1_S2174634.py Multinomial or python LFDassignment1_S2174634.py Binary", file=sys.stderr)
     exit(-1)
 
+# X and Y are the returned documents and labels respectively. X and Y are both splitted at 75%, which implies 75% of the data is used as traindata and the rest as testdata.
 X, Y = read_corpus('all_sentiment_shuffled.txt', sentiment)
 split_point = int(0.75*len(X))
 Xtrain = X[:split_point]
@@ -69,12 +73,10 @@ classifier.fit(Xtrain, Ytrain)
 Yguess = classifier.predict(Xtest)
 
 # Prints the accuracy scores, which compares the correct labels from Ytest with predicted ones from the system in Yguess.
-#print(classification_report(Ytest, Yguess))
-#print("Overal accuracy:", accuracy_score(Ytest, Yguess))
-#print(classifier.predict_proba(Xtest))
+print(classification_report(Ytest, Yguess))
+print("Overal accuracy:", accuracy_score(Ytest, Yguess))
+print("Posterior probabilities:")
+print(classifier.predict_proba(Xtest))
 
-labelbin = LabelBinarizer()
-print(labelbin.fit_transform(classes))
-
-
-
+c = Counter(Y)
+print(c.items())
