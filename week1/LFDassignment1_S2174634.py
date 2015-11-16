@@ -1,10 +1,11 @@
+import sys
 from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
 from sklearn.naive_bayes import MultinomialNB
 from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import LabelBinarizer
+from sklearn.metrics import accuracy_score, classification_report
 
-from sklearn.metrics import accuracy_score
-
-# COMMENT THIS
+# Function that reads the corpus given as an argument and based on the second argument uses the the binary or multinomial classification.
 def read_corpus(corpus_file, use_sentiment):
     documents = []
     labels = []
@@ -27,8 +28,17 @@ def read_corpus(corpus_file, use_sentiment):
 def identity(x):
     return x
 
-# COMMENT THIS
-X, Y = read_corpus('all_sentiment_shuffled.txt', use_sentiment=True)
+# X and Y are the returned documents and labels respectively. X and Y are both splitted at 75%, which implies 75% of the data is used as traindata and the rest as testdata.
+sentiment = sys.argv[1]
+if sentiment == "Multinomial":
+    sentiment = False
+elif sentiment == "Binary":
+    sentiment = True
+else:
+    print("Usage: python LFDassignment1.py Multinomial or python LFDassignment1 Binary", file=sys.stderr)
+    exit(-1)
+
+X, Y = read_corpus('all_sentiment_shuffled.txt', sentiment)
 split_point = int(0.75*len(X))
 Xtrain = X[:split_point]
 Ytrain = Y[:split_point]
@@ -52,12 +62,19 @@ classifier = Pipeline( [('vec', vec),
                         ('cls', MultinomialNB())] )
 
 
-# COMMENT THIS
+# Trains the classifier based on the training documents and labels.
 classifier.fit(Xtrain, Ytrain)
 
-# COMMENT THIS  
+# Using the trained classifier to predict the labels for the testdata.
 Yguess = classifier.predict(Xtest)
 
-# COMMENT THIS
-print(accuracy_score(Ytest, Yguess))
+# Prints the accuracy scores, which compares the correct labels from Ytest with predicted ones from the system in Yguess.
+#print(classification_report(Ytest, Yguess))
+#print("Overal accuracy:", accuracy_score(Ytest, Yguess))
+#print(classifier.predict_proba(Xtest))
+
+labelbin = LabelBinarizer()
+print(labelbin.fit_transform(classes))
+
+
 
