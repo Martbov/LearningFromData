@@ -49,19 +49,20 @@ class KerasNN(object):
         print("Building model...")
         self.model = Sequential()
 
-        # Comment this...
-        self.model.add(Dense(self.layer1_hidden_units, input_dim=self.nb_features))
+        # Adds the amount of neurons and layers for features using the sigmoid activation function
+        self.model.add(MaxoutDense(self.layer1_hidden_units, input_dim=self.nb_features))
         self.model.add(Activation('sigmoid'))
 
-        # Comment this...
-        self.model.add(Dense(self.nb_classes, input_dim=self.layer1_hidden_units))
+        # Adds the amount of neurons and layers for classes
+        self.model.add(MaxoutDense(self.nb_classes, input_dim=self.layer1_hidden_units))
         self.model.add(Activation('softmax'))
 
-        # Comment this...
+        #self.model.add(Dropout(0.1))
+        # Compiles the model and adds optimizer SGD, other possibilites are for example 'Adam'
         #self.sgd = SGD(lr=0.5, momentum=0., decay=0.1, nesterov=False)
         self.model.compile(loss='categorical_crossentropy', optimizer='sgd')
 
-        self.model.add(Dropout(0.01))
+        
 
     def train_model(self):
         print("Training model...")
@@ -82,8 +83,8 @@ class KerasNN(object):
         np.save(self.name, pred_classes)
 
 parser = argparse.ArgumentParser(description='KerasNN parameters')
-parser.add_argument('--units', metavar='xx', type=int, default=1000, help='units')
-parser.add_argument('--epochs', metavar='xx', type=int, default=50, help='epochs')
+parser.add_argument('--units', metavar='xx', type=int, default=500, help='units')
+parser.add_argument('--epochs', metavar='xx', type=int, default=100, help='epochs')
 parser.add_argument('--bsize', metavar='xx', type=int, default=10, help='batch size')
 parser.add_argument('--name', type=str, default='tratz_test_output', help='output file name')
 args = parser.parse_args()
