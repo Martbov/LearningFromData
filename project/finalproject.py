@@ -52,7 +52,7 @@ def tokenizer(document):
 	return ' '.join(nltk.word_tokenize(document))
 
 def preprocessing(document):
-	"""Small preprocessing function"""
+	"""Small preprocessing function which, after testing different settings, became obsolete"""
 	oldWords = document.split()
 	# Attempt to exclude punctuation from the tweets, but results were lower than tweets with punctuation
 	"""punctList = ['!', '?', '@' ',', '.', '(', ')', '/', '\\', '|', '“', '"']
@@ -75,7 +75,7 @@ def preprocessing(document):
 	return ' '.join(newWords)
 
 
-def genderClassfier(doc, gen):
+def genderClassifier(doc, gen):
 	"""A classifier for classifying gender"""
 	splitPoint = int(0.8*len(doc))
 	xTrain = doc
@@ -83,11 +83,10 @@ def genderClassfier(doc, gen):
 	yTrain = gen
 	#yTest = gen[splitPoint:]
 
-	#vec = TfidfVectorizer(preprocessor = preprocessing, sublinear_tf = True)
 	unionOfFeatures = FeatureUnion([
-									('normaltfidf', TfidfVectorizer(preprocessor = preprocessing, max_features = 800)),
-									('bigrams', TfidfVectorizer(preprocessor = preprocessing, ngram_range = (2,2), analyzer = 'char', max_features = 800)),
-									('counts', CountVectorizer(preprocessor = preprocessing, max_features = 800))
+									('normaltfidf', TfidfVectorizer(preprocessor = identity, max_features = 800)),
+									('bigrams', TfidfVectorizer(preprocessor = identity, ngram_range = (2,2), analyzer = 'char', max_features = 800)),
+									('counts', CountVectorizer(preprocessor = identity, max_features = 800))
 									])
 
 	featureFit = unionOfFeatures.fit(xTrain, yTrain).transform(xTrain)
@@ -106,11 +105,10 @@ def ageClassifier(doc, age):
 	yTrain = age
 	#yTest = age[splitPoint:]
 
-	#vec = TfidfVectorizer(preprocessor = preprocessing, sublinear_tf = True)
 	unionOfFeatures = FeatureUnion([
-									('normaltfidf', TfidfVectorizer(preprocessor = preprocessing, max_features = 800)),
-									('bigrams', TfidfVectorizer(preprocessor = preprocessing, ngram_range = (2,2), analyzer = 'char', max_features = 800)),
-									('counts', CountVectorizer(preprocessor = preprocessing, max_features = 800))
+									('normaltfidf', TfidfVectorizer(preprocessor = identity, max_features = 800)),
+									('bigrams', TfidfVectorizer(preprocessor = identity, ngram_range = (2,2), analyzer = 'char', max_features = 800)),
+									('counts', CountVectorizer(preprocessor = identity, max_features = 800))
 									])
 
 	featureFit = unionOfFeatures.fit(xTrain, yTrain).transform(xTrain)
@@ -127,22 +125,37 @@ def makePredictions(genderclassifier, ageclassifier, testdocs, testauthors):
 		combinationList.append([author, document])
 
 	for pairlist in combinationList:
-		pairlist.append(genderclassifier.predict(pairlist[1]))
+		pairlist.append(genderclassifier.predict([pairlist[0]]))
 		if ageclassifier == 'dutchAgeClassifier':
 			pairlist.append('XX-XX')
 		elif ageclassifier == 'italianAgeClassifier':
 			pairlist.append('XX-XX')
 		else:
-			pairlist.append(ageclassifier.predict(pairlist[1]))
+			pairlist.append(ageclassifier.predict([pairlist[0]]))
 
 	return combinationList
 
 def writeTruthFile(language, combinationList):
-	filename = 'truth' + language.upper()[:3] + '.txt'
-	if language == 'english':
+	filename = 'test/' + language + '/' 'truth' + language.upper()[:3] + '.txt'
+	truthfile = open(filename, 'w')
+	genderDict = defaultdict(list)
+	ageDict = defaultdict(list)
+	if language == 'english' or language == 'spanish':
 		for combination in combinationList:
-			print(combination[1], Counter(list(combination[2])).most_common(1)[0], Counter(list(combination[3])).most_common(1)[0])
-		
+			#print(combination[1], combination[2][0], combination[3][0])
+			genderDict[combination[1]].append(combination[2][0])
+			ageDict[combination[1]].append(combination[3][0])
+		#print(genderDict.items())		
+		for key, value in genderDict.items():
+			#print(str(key))
+			truthfile.write(str(key) + ':::' + str(Counter(value).most_common(1)[0][0]) + ':::' + str(Counter(ageDict[key]).most_common(1)[0][0]) + '\n')
+			#print(Counter(value).most_common(1)[0][0])
+			#print(Counter(ageDict[key]).most_common(1)[0][0])
+	else:
+		for combination in combinationList:
+			genderDict[combination[1]].append(combination[2][0])
+		for key, value in genderDict.items():
+			truthfile.write(str(key) + ':::' + str(Counter(value).most_common(1)[0][0]) + ':::' + 'XX-XX' + '\n')
 
 if __name__ == '__main__':
 	"""# For training
@@ -152,57 +165,57 @@ if __name__ == '__main__':
 		language = sys.argv[1]
 		if language == 'english':
 			engDOC, engGEN, engAGE, engAUT = fileRead(language, 'training')
-			#genderClassfier(engDOC, engGEN)
+			#genderClassifier(engDOC, engGEN)
 			#ageClassifier(engDOC, engAGE)
 		elif language == 'dutch':
 			dutDOC, dutGEN, dutAGE, dutAUT = fileRead(language, 'training')
-			genderClassfier(dutDOC, dutGEN)
+			genderClassifier(dutDOC, dutGEN)
 			ageClassifier(dutDOC, dutAGE)
 		elif language == 'italian':
 			itaDOC, itaGEN, itaAGE, itaAUT = fileRead(language, 'training')
-			genderClassfier(itaDOC, itaGEN)
+			genderClassifier(itaDOC, itaGEN)
 			ageClassifier(itaDOC, itaAGE)
 		elif language == 'spanish':
 			spaDOC, spaGEN, spaAGE, spaAUT = fileRead(language, 'training')
-			genderClassfier(spaDOC, spaGEN)
+			genderClassifier(spaDOC, spaGEN)
 			ageClassifier(spaDOC, spaAGE)
 		else:
 			print("Use language 'english', 'dutch', 'spanish' or 'italian'")"""
 
 	print("Reading in files...", file=sys.stderr)
-	trainengDOC, trainengGEN, trainengAGE, trainengAUT = fileRead('english', 'training')
-	testengDOC, testengAUT = fileRead('english', 'testing')
-	traindutDOC, traindutGEN, traindutAGE, traindutAUT = fileRead('dutch', 'training')
-	testdutDOC, testdutAUT = fileRead('dutch', 'testing')
-	trainitaDOC, trainitaGEN, trainitaAGE, trainitaAUT = fileRead('italian', 'training')
-	testitaDOC, testitaAUT = fileRead('italian', 'testing')
-	trainspaDOC, trainspaGEN, trainspaAGE, trainspaAUT = fileRead('spanish', 'training')
-	testspaDOC, testspaAUT = fileRead('spanish', 'testing')
+	trainengDOC, trainengGEN, trainengAGE, trainengAUT = fileRead('english', str(sys.argv[1]))
+	testengDOC, testengAUT = fileRead('english', str(sys.argv[2]))
+	traindutDOC, traindutGEN, traindutAGE, traindutAUT = fileRead('dutch', str(sys.argv[1]))
+	testdutDOC, testdutAUT = fileRead('dutch', str(sys.argv[2]))
+	trainitaDOC, trainitaGEN, trainitaAGE, trainitaAUT = fileRead('italian', str(sys.argv[1]))
+	testitaDOC, testitaAUT = fileRead('italian', str(sys.argv[2]))
+	trainspaDOC, trainspaGEN, trainspaAGE, trainspaAUT = fileRead('spanish', str(sys.argv[1]))
+	testspaDOC, testspaAUT = fileRead('spanish', str(sys.argv[2]))
 	print("Reading in files: Done!", file=sys.stderr)
-
+	
 	print("Training classifiers...", file=sys.stderr)
-	englishGenderClassifier = genderClassfier(trainengDOC, trainengGEN)
+	englishGenderClassifier = genderClassifier(trainengDOC, trainengGEN)
 	englishAgeClassifier = ageClassifier(trainengDOC, trainengAGE)
-	#dutchGenderClassifier = genderClassfier(traindutDOC, traindutGEN)
+	dutchGenderClassifier = genderClassifier(traindutDOC, traindutGEN)
 	#dutchAgeClassifier = ageClassifier(traindutDOC, traindutAGE)
-	#italianGenderClassifier = genderClassfier(trainitaDOC, trainitaGEN)
+	italianGenderClassifier = genderClassifier(trainitaDOC, trainitaGEN)
 	#italianAgeClassifier = ageClassifier(trainitaDOC, trainitaAGE)
-	#spanishGenderClassifier = genderClassfier(trainspaDOC, trainspaGEN)
-	#spanishAgeClassifier = ageClassifier(trainspaDOC, trainspaAGE)
+	spanishGenderClassifier = genderClassifier(trainspaDOC, trainspaGEN)
+	spanishAgeClassifier = ageClassifier(trainspaDOC, trainspaAGE)
 	print("Training classifiers: Done!", file=sys.stderr)
 
 	print("Making predictions...", file=sys.stderr)
 	englishPredictions = makePredictions(englishGenderClassifier, englishAgeClassifier, testengDOC, testengAUT)
-	#dutchPredictions = makePredictions(dutchGenderClassifier, 'dutchAgeClassifier', testdutDOC, testdutAUT)
-	#italianPredictions = makePredictions(italianGenderClassifier, 'italianAgeClassifier', testitaDOC, testitaAUT)
-	#spanishPredictions = makePredictions(spanishGenderClassifier, spanishAgeClassifier, testspaDOC, testspaAUT)
+	dutchPredictions = makePredictions(dutchGenderClassifier, 'dutchAgeClassifier', testdutDOC, testdutAUT)
+	italianPredictions = makePredictions(italianGenderClassifier, 'italianAgeClassifier', testitaDOC, testitaAUT)
+	spanishPredictions = makePredictions(spanishGenderClassifier, spanishAgeClassifier, testspaDOC, testspaAUT)
 	print("Making predictions: Done!", file=sys.stderr)
 
 	print("Writing truth files...", file=sys.stderr)
 	writeTruthFile('english', englishPredictions)
-	#writeTruthFile('dutch', dutchPredictions)
-	#writeTruthFile('italian', italianPredictions)
-	#writeTruthFile('spanish', spanishPredictions)
+	writeTruthFile('dutch', dutchPredictions)
+	writeTruthFile('italian', italianPredictions)
+	writeTruthFile('spanish', spanishPredictions)
 	print("Writing truth files: Done!", file=sys.stderr)
 
 
