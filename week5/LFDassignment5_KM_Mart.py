@@ -18,7 +18,7 @@ def read_corpus(corpus_file, use_sentiment):
 		for line in f:
 			tokens = line.strip().split()
 			use_stopword = False
-			use_grams = False
+			use_grams = True
 			if use_stopword:
 				stopwordfile = open('stopwords.txt', 'r')
 				stopwords = []
@@ -92,6 +92,7 @@ def bestClassify(X,Y):
 
 
 X, Y = read_corpus('all_sentiment_shuffled.txt', True)
+print(X)
 bestClassify(X,Y)
 
 """
