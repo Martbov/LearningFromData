@@ -1,7 +1,6 @@
 #!usr/bin/python3.4
 
-import sys
-import glob
+import sys, glob, nltk, re, string
 from collections import defaultdict, Counter
 import xml.etree.ElementTree as ET
 from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer
@@ -10,11 +9,12 @@ from sklearn.naive_bayes import MultinomialNB
 from sklearn.pipeline import Pipeline, FeatureUnion
 from sklearn.metrics import accuracy_score, classification_report
 from sklearn.cross_validation import cross_val_score
-import nltk
 from sklearn import svm
+from nltk.stem import WordNetLemmatizer
+
 
 def fileRead(language, setting):
-	"""Reads in data from the directories"""
+	""" Reads in data from the directories """
 	informationDict = defaultdict(list)
 	documents = []
 	genders = []
@@ -26,9 +26,6 @@ def fileRead(language, setting):
 			truthvalues = [value for value in line.strip().split(':::')]
 			informationDict[truthvalues[0]] = (truthvalues[1], truthvalues[2])
 	fileList = [xmlfile for xmlfile in glob.glob(setting + '/' + language + '/*.xml')]
-	#for author in fileList:
-	#	print(author)
-	#	print(author.split('/')[2].split('.')[0])
 	for xmlfile in fileList:
 		tree = ET.parse(xmlfile)
 		root = tree.getroot()
@@ -45,81 +42,113 @@ def fileRead(language, setting):
 		return documents, authors
 
 def identity(x):
+	""" Placeholder function for preprocessing and tokenizing function, for easily switching """
 	return x
 
-def tokenizer(document):
-	"""Tokenizer function"""
-	return ' '.join(nltk.word_tokenize(document))
+def tokenizerStemmer(document):
+	""" Tokenizer/Lemmatizer function """
+	words = document.split()
+	tokens = []
+	wnl = WordNetLemmatizer()
+	for word in words:
+		tokens.append(wnl.lemmatize(word))
+	return ' '.join(tokens)
+	#return ' '.join(nltk.word_tokenize(document))
 
 def preprocessing(document):
-	"""Small preprocessing function which, after testing different settings, became obsolete"""
-	oldWords = document.split()
-	# Attempt to exclude punctuation from the tweets, but results were lower than tweets with punctuation
-	"""punctList = ['!', '?', '@' ',', '.', '(', ')', '/', '\\', '|', '“', '"']
-	for i in range(len(oldWords)):
-		for char in oldWords[i]:
-			if char in punctList:
-				oldWords[i] = oldWords[i].replace(char, '')"""
-	newWords = []
-	
-	for word in oldWords:
-		if word.startswith('#'):
-			newWords.append('hashtag')
-		elif word.startswith('http'):
-			newWords.append('LINK')
-		else:
-			newWords.append(word.lower())
-	#taggedWords = nltk.pos_tag(newWords)
-	#print(taggedWords)
-	#print(' '.join(newWords))
-	return ' '.join(newWords)
+	""" Small preprocessing function which, after testing different settings, became fully obsolete """
+	exclude = set(string.punctuation)
+	document = document.lower()
+	document = re.sub(r"http\S+", "link", document)
+	document = ''.join(ch for ch in document if ch not in exclude)
+	return document
 
-
-def genderClassifier(doc, gen):
-	"""A classifier for classifying gender"""
+def trainGenderclassification(doc, gen, lang):
+	""" A function for testing out different settings to increase scores and present final train scores """
 	splitPoint = int(0.8*len(doc))
-	xTrain = doc
-	#xTest = doc[splitPoint:]
-	yTrain = gen
-	#yTest = gen[splitPoint:]
+	xTrain = doc[:splitPoint]
+	xTest = doc[splitPoint:]
+	yTrain = gen[:splitPoint]
+	yTest = gen[splitPoint:]
+
 
 	unionOfFeatures = FeatureUnion([
-									('normaltfidf', TfidfVectorizer(preprocessor = identity, max_features = 800)),
-									('bigrams', TfidfVectorizer(preprocessor = identity, ngram_range = (2,2), analyzer = 'char', max_features = 800)),
-									('counts', CountVectorizer(preprocessor = identity, max_features = 800))
+									('normaltfidf', TfidfVectorizer(preprocessor = identity, tokenizer = identity)),
+									('bigrams', TfidfVectorizer(preprocessor = identity, tokenizer = identity, ngram_range = (2,2), analyzer = 'char')),
+									('counts', CountVectorizer(preprocessor = identity, tokenizer = identity))
+									])
+
+	#classifier = Pipeline([('vec', TfidfVectorizer()), ('cls', svm.SVC(kernel='rbf', C=1.5))])
+	featureFit = unionOfFeatures.fit(xTrain, yTrain).transform(xTrain)
+	classifier = Pipeline([('featureunion', unionOfFeatures), ('cls', svm.SVC(kernel='linear', C=1.5))])
+	classifier.fit(xTrain, yTrain)
+
+	yGuess = classifier.predict(xTest)
+	print(classification_report(yTest, yGuess))
+	print(lang, "gender accuracy score:")
+	print(accuracy_score(yTest, yGuess))
+	
+
+def trainAgeclassification(doc, age, lang):
+	""" A function for testing out different settings to increase scores """
+	splitPoint = int(0.8*len(doc))
+	xTrain = doc[:splitPoint]
+	xTest = doc[splitPoint:]
+	yTrain = age[:splitPoint]
+	yTest = age[splitPoint:]
+
+	unionOfFeatures = FeatureUnion([
+									('normaltfidf', TfidfVectorizer(preprocessor = identity, tokenizer = identity)),
+									('bigrams', TfidfVectorizer(preprocessor = identity, tokenizer = identity, ngram_range = (3,3), analyzer = 'char')),
+									('counts', CountVectorizer(preprocessor = identity, tokenizer = identity))
+									])
+
+	
+	featureFit = unionOfFeatures.fit(xTrain, yTrain).transform(xTrain)
+	classifier = Pipeline([('featureunion', unionOfFeatures), ('cls', svm.SVC(kernel='linear', C=1.5))])
+	classifier.fit(xTrain, yTrain)
+
+	yGuess = classifier.predict(xTest)
+	print(classification_report(yTest, yGuess))
+	print(lang, "age accuracy score:")
+	print(accuracy_score(yTest, yGuess))
+
+def genderClassifier(doc, gen):
+	""" A function that trains a gender classifier """
+	xTrain = doc
+	yTrain = gen
+
+	unionOfFeatures = FeatureUnion([
+									('normaltfidf', TfidfVectorizer(preprocessor = identity, tokenizer = identity)),
+									('bigrams', TfidfVectorizer(preprocessor = identity, tokenizer = identity, ngram_range = (2,2), analyzer = 'char')),
+									('counts', CountVectorizer(preprocessor = identity, tokenizer = identity))
 									])
 
 	featureFit = unionOfFeatures.fit(xTrain, yTrain).transform(xTrain)
 	classifier = Pipeline([('featureunion', unionOfFeatures), ('cls', svm.SVC(kernel='linear', C=1.5))])
 	classifier.fit(xTrain, yTrain)
-	#yGuess = classifier.predict(xTest)
-	#print(classification_report(yTest, yGuess))
 	
 	return classifier
 
 def ageClassifier(doc, age):
-	"""A classifier for classifying age"""
-	splitPoint = int(0.8*len(doc))
+	""" A function that trains an age classifier """
 	xTrain = doc
-	#xTest = doc[splitPoint:]
 	yTrain = age
-	#yTest = age[splitPoint:]
 
 	unionOfFeatures = FeatureUnion([
-									('normaltfidf', TfidfVectorizer(preprocessor = identity, max_features = 800)),
-									('bigrams', TfidfVectorizer(preprocessor = identity, ngram_range = (2,2), analyzer = 'char', max_features = 800)),
-									('counts', CountVectorizer(preprocessor = identity, max_features = 800))
+									('normaltfidf', TfidfVectorizer(preprocessor = identity, tokenizer = identity)),
+									('bigrams', TfidfVectorizer(preprocessor = identity, tokenizer = identity, ngram_range = (3,3), analyzer = 'char')),
+									('counts', CountVectorizer(preprocessor = identity, tokenizer = identity))
 									])
 
 	featureFit = unionOfFeatures.fit(xTrain, yTrain).transform(xTrain)
 	classifier = Pipeline([('featureunion', unionOfFeatures), ('cls', svm.SVC(kernel='linear', C=1.5))])
 	classifier.fit(xTrain, yTrain)
-	#yGuess = classifier.predict(xTest)
-	#print(classification_report(yTest, yGuess))
 	
 	return classifier
 
 def makePredictions(genderclassifier, ageclassifier, testdocs, testauthors):
+	""" A function that predicts the genders and age categories for test data """
 	combinationList = []
 	for document, author in zip(testauthors, testdocs):
 		combinationList.append([author, document])
@@ -136,21 +165,17 @@ def makePredictions(genderclassifier, ageclassifier, testdocs, testauthors):
 	return combinationList
 
 def writeTruthFile(language, combinationList):
-	filename = 'test/' + language + '/' 'truth' + language.upper()[:3] + '.txt'
+	""" A function that writes the predictions to the corrosponding truth files """
+	filename = 'test/' + language + '/truth.txt'
 	truthfile = open(filename, 'w')
 	genderDict = defaultdict(list)
 	ageDict = defaultdict(list)
 	if language == 'english' or language == 'spanish':
 		for combination in combinationList:
-			#print(combination[1], combination[2][0], combination[3][0])
 			genderDict[combination[1]].append(combination[2][0])
 			ageDict[combination[1]].append(combination[3][0])
-		#print(genderDict.items())		
 		for key, value in genderDict.items():
-			#print(str(key))
 			truthfile.write(str(key) + ':::' + str(Counter(value).most_common(1)[0][0]) + ':::' + str(Counter(ageDict[key]).most_common(1)[0][0]) + '\n')
-			#print(Counter(value).most_common(1)[0][0])
-			#print(Counter(ageDict[key]).most_common(1)[0][0])
 	else:
 		for combination in combinationList:
 			genderDict[combination[1]].append(combination[2][0])
@@ -159,29 +184,29 @@ def writeTruthFile(language, combinationList):
 
 if __name__ == '__main__':
 	"""# For training
-	if len(sys.argv) != 2:
-		print("Usage: python finalproject.py <language>", file=sys.stderr)
-	else:
-		language = sys.argv[1]
-		if language == 'english':
-			engDOC, engGEN, engAGE, engAUT = fileRead(language, 'training')
-			#genderClassifier(engDOC, engGEN)
-			#ageClassifier(engDOC, engAGE)
-		elif language == 'dutch':
-			dutDOC, dutGEN, dutAGE, dutAUT = fileRead(language, 'training')
-			genderClassifier(dutDOC, dutGEN)
-			ageClassifier(dutDOC, dutAGE)
-		elif language == 'italian':
-			itaDOC, itaGEN, itaAGE, itaAUT = fileRead(language, 'training')
-			genderClassifier(itaDOC, itaGEN)
-			ageClassifier(itaDOC, itaAGE)
-		elif language == 'spanish':
-			spaDOC, spaGEN, spaAGE, spaAUT = fileRead(language, 'training')
-			genderClassifier(spaDOC, spaGEN)
-			ageClassifier(spaDOC, spaAGE)
-		else:
-			print("Use language 'english', 'dutch', 'spanish' or 'italian'")"""
-
+	language = 'english'
+	if language == 'english':
+		engDOC, engGEN, engAGE, engAUT = fileRead(language, 'training')
+		trainGenderclassification(engDOC, engGEN, 'English')
+		trainAgeclassification(engDOC, engAGE, 'English')
+	language = 'dutch'
+	if language == 'dutch':
+		dutDOC, dutGEN, dutAGE, dutAUT = fileRead(language, 'training')
+		trainGenderclassification(dutDOC, dutGEN, 'Dutch')
+		#trainAgeclassification(dutDOC, dutAGE)
+	language = 'italian'
+	if language == 'italian':
+		itaDOC, itaGEN, itaAGE, itaAUT = fileRead(language, 'training')
+		trainGenderclassification(itaDOC, itaGEN, 'Italian')
+		#trainAgeclassification(itaDOC, itaAGE)
+	language = 'spanish'
+	if language == 'spanish':
+		spaDOC, spaGEN, spaAGE, spaAUT = fileRead(language, 'training')
+		trainGenderclassification(spaDOC, spaGEN, 'Spanish')
+		trainAgeclassification(spaDOC, spaAGE, 'Spanish')"""
+	
+	
+	
 	print("Reading in files...", file=sys.stderr)
 	trainengDOC, trainengGEN, trainengAGE, trainengAUT = fileRead('english', str(sys.argv[1]))
 	testengDOC, testengAUT = fileRead('english', str(sys.argv[2]))
