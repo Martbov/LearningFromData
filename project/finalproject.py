@@ -166,7 +166,7 @@ def makePredictions(genderclassifier, ageclassifier, testdocs, testauthors):
 
 def writeTruthFile(language, combinationList):
 	""" A function that writes the predictions to the corrosponding truth files """
-	filename = 'test/' + language + '/truth.txt'
+	filename = str(sys.argv[2]) + '/' + language + '/truth.txt'
 	truthfile = open(filename, 'w')
 	genderDict = defaultdict(list)
 	ageDict = defaultdict(list)
